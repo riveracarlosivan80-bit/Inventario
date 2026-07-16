@@ -1,0 +1,1231 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Inventario de Alto Rendimiento en la Nube</title>
+<!-- Cargamos la librería oficial de Supabase -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Cargamos la librería del lector de códigos de barras por cámara -->
+<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght=500;600;700&family=Inter:wght=400;500;600&family=IBM+Plex+Mono:wght=400;500;600&display=swap');
+
+:root{
+  --paper:#F5F6F2;
+  --surface:#FFFFFF;
+  --ink:#1F2E2B;
+  --ink-soft:#5B6B63;
+  --border:#DDD8CC;
+  --amber:#C98A1F;
+  --amber-deep:#9C6A12;
+  --teal:#2F6F62;
+  --danger:#B5423B;
+  --danger-bg:#FBEDEA;
+}
+
+*{box-sizing:border-box;}
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:'Inter',sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+
+.wrap{max-width:960px;margin:0 auto;padding:28px 20px 80px;}
+
+/* ---- Pantalla de Login ---- */
+.login-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 20px;
+  background: var(--paper);
+}
+.login-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 32px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+.login-card h2 {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 28px;
+  margin-top: 0;
+  margin-bottom: 24px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid var(--ink);
+  padding-bottom: 8px;
+}
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.login-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--ink-soft);
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+.login-form input {
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 14px;
+  outline: none;
+}
+.login-form input:focus {
+  border-color: var(--teal);
+}
+.login-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+.login-toggle {
+  text-align: center;
+  font-size: 12px;
+  color: var(--ink-soft);
+  cursor: pointer;
+  text-decoration: underline;
+}
+.login-toggle:hover {
+  color: var(--teal);
+}
+
+/* ---- Header / receipt summary ---- */
+.header{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-end;
+  flex-wrap:wrap;
+  gap:16px;
+  border-bottom:2px solid var(--ink);
+  padding-bottom:16px;
+  margin-bottom:20px;
+}
+.store-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.store-name{
+  font-family:'Barlow Condensed',sans-serif;
+  font-weight:700;
+  font-size:38px;
+  letter-spacing:0.5px;
+  border:none;
+  background:transparent;
+  color:var(--ink);
+  padding:0;
+  outline:none;
+  width:min(420px,60vw);
+}
+.store-name::placeholder{color:var(--ink-soft);}
+.summary{
+  display:flex;
+  gap:22px;
+  font-family:'IBM Plex Mono',monospace;
+  text-align:right;
+}
+.summary .stat{display:flex;flex-direction:column;gap:2px;}
+.summary .num{font-size:20px;font-weight:600;color:var(--ink);}
+.summary .lbl{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--ink-soft);}
+.summary .num.danger{color:var(--danger);}
+
+/* ---- Low stock banner ---- */
+.banner{
+  display:none;
+  align-items:center;
+  gap:10px;
+  background:var(--danger-bg);
+  border-left:4px dashed var(--danger);
+  color:var(--danger);
+  padding:10px 14px;
+  font-size:13px;
+  font-weight:500;
+  border-radius:2px;
+  margin-bottom:20px;
+}
+.banner.show{display:flex;}
+
+/* ---- Controls ---- */
+.controls{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-bottom:18px;
+  align-items:center;
+}
+input,select,button{
+  font-family:'Inter',sans-serif;
+  font-size:13.5px;
+}
+.controls input[type="text"],.controls select{
+  padding:8px 10px;
+  border:1px solid var(--border);
+  border-radius:4px;
+  background:var(--surface);
+  color:var(--ink);
+}
+.controls input[type="text"]{flex:1;min-width:160px;}
+.btn{
+  border:1px solid var(--ink);
+  background:var(--ink);
+  color:var(--paper);
+  padding:9px 16px;
+  border-radius:4px;
+  cursor:pointer;
+  font-weight:600;
+  letter-spacing:0.2px;
+}
+.btn:hover{background:#324B44;}
+.btn.ghost{
+  background:transparent;
+  color:var(--ink);
+  border:1px solid var(--border);
+  font-weight:500;
+}
+.btn.ghost:hover{border-color:var(--ink);}
+.btn.amber{background:var(--amber);border-color:var(--amber);color:#2A1D06;}
+.btn.amber:hover{background:var(--amber-deep);}
+
+/* ---- Add form ---- */
+.form-panel{
+  display:none;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:6px;
+  padding:18px;
+  margin-bottom:20px;
+}
+.form-panel.show{display:block;}
+.form-grid{
+  display:grid;
+  grid-template-columns:2fr 1fr 1fr 1fr 1fr;
+  gap:10px;
+  margin-bottom:12px;
+}
+.form-grid label{
+  display:flex;flex-direction:column;gap:4px;
+  font-size:11px;color:var(--ink-soft);letter-spacing:0.3px;text-transform:uppercase;
+}
+.form-grid input{
+  padding:8px 9px;border:1px solid var(--border);border-radius:4px;font-family:'IBM Plex Mono',monospace;
+}
+.form-grid input#f-name{font-family:'Inter',sans-serif;}
+
+/* ---- Table (ledger) ---- */
+.ledger{width:100%;border-collapse:collapse;}
+.ledger thead th{
+  text-align:left;
+  font-size:11px;
+  letter-spacing:1px;
+  text-transform:uppercase;
+  color:var(--ink-soft);
+  border-bottom:1px solid var(--ink);
+  padding:0 8px 8px;
+  font-weight:600;
+}
+.ledger thead th.num,.ledger td.num{text-align:right;}
+.ledger tbody tr{border-bottom:1px solid var(--border);}
+.ledger tbody tr:hover{background:rgba(47,111,98,0.04);}
+
+/* SÚPER PODER 3: Animación de pulso continuo para productos en stock crítico */
+@keyframes pulse-red-row {
+  0% { box-shadow: inset 4px 0 0 var(--danger); background-color: var(--surface); }
+  50% { box-shadow: inset 4px 0 0 var(--danger); background-color: var(--danger-bg); }
+  100% { box-shadow: inset 4px 0 0 var(--danger); background-color: var(--surface); }
+}
+.ledger tbody tr.low{
+  animation: pulse-red-row 2s infinite;
+}
+
+.ledger td{padding:12px 8px;vertical-align:middle;}
+.p-name{font-weight:600;}
+.p-cat{font-size:11px;color:var(--ink-soft);}
+.p-sku{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-soft);}
+.leader{
+  position:relative;
+  overflow:hidden;
+  white-space:nowrap;
+}
+.qty-controls{display:flex;align-items:center;gap:6px;justify-content:flex-end;}
+.qty-controls button{
+  width:24px;height:24px;border-radius:50%;border:1px solid var(--border);background:var(--surface);
+  cursor:pointer;font-weight:600;color:var(--ink);line-height:1;
+}
+.qty-controls button:hover{border-color:var(--ink);}
+.qty-num{font-family:'IBM Plex Mono',monospace;font-weight:600;min-width:34px;text-align:center;}
+.qty-num.low{color:var(--danger);}
+.price-cell{font-family:'IBM Plex Mono',monospace;font-weight:500;}
+.row-actions{display:flex;gap:6px;justify-content:flex-end;}
+.icon-btn{
+  border:none;background:transparent;cursor:pointer;color:var(--ink-soft);font-size:14px;padding:4px;
+}
+.icon-btn:hover{color:var(--danger);}
+
+.empty{
+  text-align:center;padding:60px 20px;color:var(--ink-soft);
+  font-family:'Barlow Condensed',sans-serif;font-size:20px;
+}
+
+/* ---- Footer totals (receipt style) ---- */
+.foot{
+  margin-top:22px;
+  border-top:2px dashed var(--ink);
+  padding-top:14px;
+  display:flex;
+  justify-content:flex-end;
+  gap:30px;
+  font-family:'IBM Plex Mono',monospace;
+}
+.foot .fline{display:flex;flex-direction:column;align-items:flex-end;gap:2px;}
+.foot .flabel{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--ink-soft);}
+.foot .fval{font-size:18px;font-weight:600;}
+
+/* ---- SÚPER PODER 2: Modales de Escáner y Acción Rápida ---- */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(31, 46, 43, 0.85); /* Tono oscuro a juego con --ink */
+  z-index: 1000;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+}
+.modal-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 24px;
+  width: 100%;
+  max-width: 480px;
+  text-align: center;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+}
+.modal-card h3 {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 24px;
+  margin-top: 0;
+  margin-bottom: 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid var(--ink);
+  padding-bottom: 8px;
+}
+#interactive-scanner {
+  width: 100%;
+  min-height: 250px;
+  background: #000;
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 18px;
+}
+
+@media(max-width:640px){
+  .form-grid{grid-template-columns:1fr 1fr;}
+  .ledger thead{display:none;}
+  .ledger, .ledger tbody, .ledger tr, .ledger td{display:block;width:100%;}
+  .ledger tbody tr{padding:12px 4px;border-bottom:1px solid var(--border);}
+  .ledger td{padding:3px 0;}
+  .ledger td.num{text-align:left;}
+  .row-actions{justify-content:flex-start;margin-top:6px;}
+  .qty-controls{justify-content:flex-start;}
+}
+</style>
+</head>
+<body>
+
+<!-- Pantalla de Inicio de Sesión -->
+<div class="login-wrap" id="loginPanel">
+  <div class="login-card">
+    <h2 id="loginTitle">Iniciar Sesión</h2>
+    <form class="login-form" id="authForm">
+      <label>Correo Electrónico
+        <input type="email" id="loginEmail" placeholder="ejemplo@negocio.com" required>
+      </label>
+      <label>Contraseña
+        <input type="password" id="loginPassword" placeholder="••••••••" required minlength="6">
+      </label>
+      <div class="login-actions">
+        <button type="submit" class="btn" id="submitAuthBtn">Entrar al Inventario</button>
+        <span class="login-toggle" id="toggleAuthMode">¿No tienes cuenta? Regístrate aquí</span>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL 1: ESCÁNER DE CÁMARA (SÚPER PODER 2) -->
+<div class="modal-overlay" id="scannerModal">
+  <div class="modal-card">
+    <h3>Escanear Código de Barras</h3>
+    <div id="interactive-scanner"></div>
+    <button class="btn" id="closeScannerBtn" style="width:100%;">Cerrar Cámara</button>
+  </div>
+</div>
+
+<!-- MODAL 2: ACCIÓN RÁPIDA DE ESCÁNER (SÚPER PODER 2) -->
+<div class="modal-overlay" id="scanActionModal">
+  <div class="modal-card" style="max-width:380px;">
+    <h3 id="scanActName" style="margin-bottom:8px;">Producto Encontrado</h3>
+    <div style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:var(--ink-soft); margin-bottom:20px;">
+      SKU: <span id="scanActSku"></span>
+    </div>
+    <div style="font-size:16px; margin-bottom:20px;">
+      Stock actual: <strong style="font-size:26px; font-family:'IBM Plex Mono',monospace; margin-left:8px;" id="scanActStock">0</strong>
+    </div>
+    <div style="display:flex; gap:12px; justify-content:center; margin-bottom:20px;">
+      <button class="btn ghost" id="scanActDecBtn" style="font-size:18px; padding:10px 28px; width:50%;">− 1</button>
+      <button class="btn amber" id="scanActIncBtn" style="font-size:18px; padding:10px 28px; width:50%;">+ 1</button>
+    </div>
+    <button class="btn" id="closeScanActBtn" style="width:100%;">Listo / Finalizar</button>
+  </div>
+</div>
+
+<!-- Aplicación Principal -->
+<div class="wrap" id="appWrap" style="display:none;">
+
+  <div class="header">
+    <div class="store-container">
+      <input class="store-name" id="storeName" placeholder="Nombre de tu tienda" />
+      <button class="btn ghost" id="logoutBtn" style="padding:4px 10px; font-size:11px; align-self:flex-start;">Cerrar sesión 🚪</button>
+    </div>
+    <div class="summary">
+      <div class="stat"><span class="num" id="sumSkus">0</span><span class="lbl">Productos</span></div>
+      <div class="stat"><span class="num" id="sumUnits">0</span><span class="lbl">Unidades</span></div>
+      <div class="stat"><span class="num" id="sumValue">$0.00</span><span class="lbl">Valor</span></div>
+      <div class="stat"><span class="num danger" id="sumLow">0</span><span class="lbl">Bajo stock</span></div>
+    </div>
+  </div>
+
+  <div class="banner" id="lowBanner">⚠ <span id="lowText"></span></div>
+
+  <div class="controls">
+    <input type="text" id="search" placeholder="Buscar por nombre o SKU..." />
+    <select id="filterCat"><option value="">Todas las categorías</option></select>
+    
+    <!-- SÚPER PODER 2: Botón de Escáner -->
+    <button class="btn amber" id="scanBtn" title="Escanear con cámara">Escanear SKU 📷</button>
+    
+    <!-- SÚPER PODER 1: Botón de Exportar -->
+    <button class="btn ghost" id="exportBtn" title="Exportar inventario a Excel">Exportar Excel 📊</button>
+    
+    <button class="btn ghost" id="syncBtn" title="Sincronizar datos con la nube">Sincronizar 🔄</button>
+    <button class="btn ghost" id="toggleHistory">Ver Historial ⏳</button>
+    <button class="btn" id="toggleForm" style="background:var(--ink); border-color:var(--ink);">+ Nuevo producto</button>
+  </div>
+
+  <!-- Formulario de productos -->
+  <div class="form-panel" id="formPanel">
+    <div class="form-grid">
+      <label>Nombre
+        <input type="text" id="f-name" placeholder="Ej. Refresco 600ml">
+      </label>
+      <label>SKU
+        <input type="text" id="f-sku" placeholder="REF-600">
+      </label>
+      <label>Categoría
+        <input type="text" id="f-cat" placeholder="Bebidas">
+      </label>
+      <label>Precio ($)
+        <input type="number" id="f-price" step="0.01" min="0" placeholder="0.00">
+      </label>
+      <label>Stock inicial
+        <input type="number" id="f-stock" min="0" placeholder="0">
+      </label>
+    </div>
+    <div class="form-grid" style="grid-template-columns:1fr 3fr;">
+      <label>Stock mínimo
+        <input type="number" id="f-min" min="0" placeholder="5">
+      </label>
+      <div></div>
+    </div>
+    <div style="display:flex;gap:10px;">
+      <button class="btn" id="saveBtn">Guardar producto</button>
+      <button class="btn ghost" id="cancelBtn">Cancelar</button>
+    </div>
+  </div>
+
+  <!-- Panel de Historial de Entradas y Salidas -->
+  <div class="form-panel" id="historyPanel">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:2px solid var(--ink); padding-bottom:8px;">
+      <h3 style="margin:0; font-family:'Barlow Condensed',sans-serif; font-size:22px; text-transform:uppercase; letter-spacing:0.5px;">Historial de Entradas y Salidas</h3>
+      <button class="btn ghost" id="clearHistoryBtn" style="padding:4px 10px; font-size:11px;">Limpiar Historial de la Nube</button>
+    </div>
+    <table class="ledger" id="historyTable" style="font-size:13px;">
+      <thead>
+        <tr>
+          <th>Fecha / Hora</th>
+          <th>Producto</th>
+          <th>Tipo</th>
+          <th class="num">Cantidad</th>
+          <th>Motivo / Evento</th>
+        </tr>
+      </thead>
+      <tbody id="historyBody"></tbody>
+    </table>
+    <div class="empty" id="historyEmptyMsg" style="padding:30px 0;">No hay movimientos registrados en el historial.</div>
+  </div>
+
+  <table class="ledger" id="ledgerTable">
+    <thead>
+      <tr>
+        <th>Producto</th>
+        <th>Categoría</th>
+        <th class="num">Precio</th>
+        <th class="num">Stock</th>
+        <th class="num">Subtotal</th>
+        <th class="num"></th>
+      </tr>
+    </thead>
+    <tbody id="ledgerBody"></tbody>
+  </table>
+  <div class="empty" id="emptyMsg" style="display:none;">Aún no hay productos en la base de datos. Agrega el primero arriba.</div>
+
+  <div class="foot">
+    <div class="fline"><span class="flabel">Total unidades</span><span class="fval" id="footUnits">0</span></div>
+    <div class="fline"><span class="flabel">Valor total</span><span class="fval" id="footValue">$0.00</span></div>
+  </div>
+
+</div>
+
+<script>
+// ==================== CONFIGURACIÓN DE SUPABASE ====================
+const SUPABASE_URL = "https://gmzzognrodlmzcktpmag.supabase.co"; 
+const SUPABASE_KEY = "sb_publishable_zbyah7Robk7xsLoiCrQhWg_ww_XqTc5"; // Tu llave pública integrada de forma segura[cite: 2]
+
+// Inicializamos el cliente de Supabase
+const { createClient } = supabase;
+const supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY);
+// ===================================================================
+
+let products = [];
+let history = []; 
+let storeName = "";
+let editingId = null;
+
+function money(n){ return '$' + Number(n||0).toFixed(2); }
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+// ---- SÚPER PODER 3: MOTOR DE SONIDO (AUDIO CONTEXT) ----
+let audioCtx;
+function initAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+}
+
+function playBeep(frequency, duration, type = 'sine') {
+  try {
+    initAudio();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.value = frequency;
+    gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
+  } catch(e) {
+    console.log("Audio no activado o bloqueado por el navegador.");
+  }
+}
+
+// Bips personalizados
+function beepSuccess() { playBeep(880, 0.12); } // Agudo, rápido
+function beepError() { playBeep(180, 0.35, 'sawtooth'); } // Zumbido grave
+function beepWarning() { // Dos bips medianos rápidos (alerta crítica)
+  playBeep(523, 0.08); 
+  setTimeout(() => playBeep(523, 0.08), 120);
+}
+
+
+// ---- CONTROL DE SESIÓN Y VISTA DE LOGIN ----
+let isSignUpMode = false;
+const authForm = document.getElementById('authForm');
+const loginTitle = document.getElementById('loginTitle');
+const submitAuthBtn = document.getElementById('submitAuthBtn');
+const toggleAuthMode = document.getElementById('toggleAuthMode');
+
+toggleAuthMode.addEventListener('click', () => {
+  initAudio();
+  isSignUpMode = !isSignUpMode;
+  if (isSignUpMode) {
+    loginTitle.textContent = "Registrarse";
+    submitAuthBtn.textContent = "Crear Cuenta";
+    toggleAuthMode.textContent = "¿Ya tienes cuenta? Inicia sesión";
+  } else {
+    loginTitle.textContent = "Iniciar Sesión";
+    submitAuthBtn.textContent = "Entrar al Inventario";
+    toggleAuthMode.textContent = "¿No tienes cuenta? Regístrate aquí";
+  }
+});
+
+authForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  initAudio();
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+
+  try {
+    if (isSignUpMode) {
+      const { error } = await supabaseClient.auth.signUp({ email, password });
+      if (error) throw error;
+      beepSuccess();
+      alert("¡Registro exitoso! Ya puedes iniciar sesión con tus credenciales.");
+      toggleAuthMode.click(); 
+    } else {
+      const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      beepSuccess();
+    }
+  } catch (err) {
+    beepError();
+    alert("Error de autenticación: " + err.message);
+  }
+});
+
+document.getElementById('logoutBtn').addEventListener('click', async () => {
+  initAudio();
+  const { error } = await supabaseClient.auth.signOut();
+  if (error) alert("Error al cerrar sesión: " + error.message);
+});
+
+// Monitoreo del estado de la sesión en tiempo real
+supabaseClient.auth.onAuthStateChange((event, session) => {
+  if (session) {
+    document.getElementById('loginPanel').style.display = 'none';
+    document.getElementById('appWrap').style.display = 'block';
+    loadData();
+  } else {
+    document.getElementById('loginPanel').style.display = 'flex';
+    document.getElementById('appWrap').style.display = 'none';
+    products = [];
+    history = [];
+    render();
+  }
+});
+
+// ---- CARGAR DATOS DESDE LA NUBE ----
+async function loadData(){
+  try {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) return;
+
+    const { data: pData, error: pError } = await supabaseClient
+      .from('productos')
+      .select('*')
+      .order('name', { ascending: true });
+    
+    if (pError) throw pError;
+    products = pData || [];
+
+    const { data: hData, error: hError } = await supabaseClient
+      .from('historial')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (hError) throw hError;
+    
+    history = hData ? hData.map(h => {
+      const date = new Date(h.created_at);
+      const dateStr = date.toLocaleDateString('es-MX') + ' ' + date.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+      return {
+        id: h.id,
+        timestamp: dateStr,
+        pName: h.product_name,
+        pSku: h.product_sku || '—',
+        type: h.type,
+        qty: h.qty,
+        reason: h.reason
+      };
+    }) : [];
+
+    storeName = localStorage.getItem('inventory-store-name') || "";
+    document.getElementById('storeName').value = storeName;
+
+    render();
+  } catch (err) {
+    console.error("Error al cargar datos de Supabase:", err);
+  }
+}
+
+// ---- REGISTRAR MOVIMIENTOS EN LA NUBE ----
+async function logMovement(product, type, qty, reason) {
+  try {
+    const { error } = await supabaseClient
+      .from('historial')
+      .insert([{
+        product_name: product.name,
+        product_sku: product.sku || null,
+        type: type,
+        qty: qty,
+        reason: reason
+      }]);
+    if (error) throw error;
+  } catch (err) {
+    console.error("Error al guardar historial en la nube:", err);
+  }
+}
+
+function renderCategories(){
+  const sel = document.getElementById('filterCat');
+  const current = sel.value;
+  const cats = [...new Set(products.map(p=>p.cat).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">Todas las categorías</option>' +
+    cats.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  sel.value = current;
+}
+
+function render(){
+  renderCategories();
+  const search = document.getElementById('search').value.trim().toLowerCase();
+  const filterCat = document.getElementById('filterCat').value;
+
+  let list = products.filter(p=>{
+    const matchSearch = !search || p.name.toLowerCase().includes(search) || (p.sku||'').toLowerCase().includes(search);
+    const matchCat = !filterCat || p.cat === filterCat;
+    return matchSearch && matchCat;
+  });
+
+  const body = document.getElementById('ledgerBody');
+  const empty = document.getElementById('emptyMsg');
+  body.innerHTML = '';
+
+  if(list.length === 0){
+    empty.style.display = 'block';
+    empty.textContent = products.length===0 ? 'Aún no hay productos en la base de datos. Agrega el primero arriba.' : 'No hay productos que coincidan con tu búsqueda.';
+  } else {
+    empty.style.display = 'none';
+  }
+
+  list.forEach(p=>{
+    const low = p.stock <= p.min;
+    const tr = document.createElement('tr');
+    tr.className = low ? 'low' : '';
+    tr.innerHTML = `
+      <td>
+        <div class="p-name">${escapeHtml(p.name)}</div>
+        <div class="p-sku">${escapeHtml(p.sku||'—')}</div>
+      </td>
+      <td class="p-cat">${escapeHtml(p.cat||'—')}</td>
+      <td class="num price-cell">${money(p.price)}</td>
+      <td class="num">
+        <div class="qty-controls">
+          <button data-act="dec" data-id="${p.id}">−</button>
+          <span class="qty-num ${low?'low':''}">${p.stock}</span>
+          <button data-act="inc" data-id="${p.id}">+</button>
+        </div>
+      </td>
+      <td class="num price-cell">${money(p.price*p.stock)}</td>
+      <td class="num">
+        <div class="row-actions">
+          <button class="icon-btn" data-act="edit" data-id="${p.id}" title="Editar">✎</button>
+          <button class="icon-btn" data-act="del" data-id="${p.id}" title="Eliminar">✕</button>
+        </div>
+      </td>
+    `;
+    body.appendChild(tr);
+  });
+
+  const totalUnits = products.reduce((s,p)=>s+Number(p.stock||0),0);
+  const totalValue = products.reduce((s,p)=>s+Number(p.stock||0)*Number(p.price||0),0);
+  const lowItems = products.filter(p=>p.stock<=p.min);
+
+  document.getElementById('sumSkus').textContent = products.length;
+  document.getElementById('sumUnits').textContent = totalUnits;
+  document.getElementById('sumValue').textContent = money(totalValue);
+  document.getElementById('sumLow').textContent = lowItems.length;
+  document.getElementById('footUnits').textContent = totalUnits;
+  document.getElementById('footValue').textContent = money(totalValue);
+
+  const banner = document.getElementById('lowBanner');
+  if(lowItems.length>0){
+    banner.classList.add('show');
+    document.getElementById('lowText').textContent =
+      `${lowItems.length} producto${lowItems.length>1?'s':''} con stock bajo: ${lowItems.slice(0,4).map(p=>p.name).join(', ')}${lowItems.length>4?'…':''}`;
+  } else {
+    banner.classList.remove('show');
+  }
+
+  renderHistory();
+}
+
+function renderHistory() {
+  const body = document.getElementById('historyBody');
+  const empty = document.getElementById('historyEmptyMsg');
+  body.innerHTML = '';
+
+  if (history.length === 0) {
+    empty.style.display = 'block';
+  } else {
+    empty.style.display = 'none';
+    history.forEach(h => {
+      const tr = document.createElement('tr');
+      const isEntrada = h.type === 'entrada';
+      tr.innerHTML = `
+        <td>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--ink-soft);">${escapeHtml(h.timestamp)}</div>
+        </td>
+        <td>
+          <div class="p-name" style="font-size:13px;">${escapeHtml(h.pName)}</div>
+          <div class="p-sku" style="font-size:10px;">${escapeHtml(h.pSku)}</div>
+        </td>
+        <td style="font-weight:600; color:${isEntrada ? 'var(--teal)' : 'var(--danger)'};">
+          ${isEntrada ? 'ENTRADA ↑' : 'SALIDA ↓'}
+        </td>
+        <td class="num" style="font-family:'IBM Plex Mono',monospace; font-weight:600;">
+          ${isEntrada ? '+' : '-'}${h.qty}
+        </td>
+        <td style="color:var(--ink-soft); font-size:12px;">${escapeHtml(h.reason)}</td>
+      `;
+      body.appendChild(tr);
+    });
+  }
+}
+
+// ---- FORM HANDLING ----
+function openForm(product){
+  editingId = product ? product.id : null;
+  document.getElementById('f-name').value = product ? product.name : '';
+  document.getElementById('f-sku').value = product ? product.sku : '';
+  document.getElementById('f-cat').value = product ? product.cat : '';
+  document.getElementById('f-price').value = product ? product.price : '';
+  document.getElementById('f-stock').value = product ? product.stock : '';
+  document.getElementById('f-min').value = product ? product.min : 5;
+  document.getElementById('saveBtn').textContent = product ? 'Guardar cambios' : 'Guardar producto';
+  
+  document.getElementById('formPanel').classList.add('show');
+  document.getElementById('historyPanel').classList.remove('show'); 
+  document.getElementById('f-name').focus();
+}
+
+function closeForm(){
+  editingId = null;
+  document.getElementById('formPanel').classList.remove('show');
+}
+
+document.getElementById('toggleForm').addEventListener('click', ()=>{
+  initAudio();
+  const panel = document.getElementById('formPanel');
+  if(panel.classList.contains('show')){ closeForm(); } else { openForm(null); }
+});
+
+document.getElementById('cancelBtn').addEventListener('click', closeForm);
+
+document.getElementById('toggleHistory').addEventListener('click', ()=>{
+  initAudio();
+  const hPanel = document.getElementById('historyPanel');
+  if(hPanel.classList.contains('show')){
+    hPanel.classList.remove('show');
+  } else {
+    closeForm(); 
+    hPanel.classList.add('show');
+  }
+});
+
+document.getElementById('syncBtn').addEventListener('click', () => {
+  initAudio();
+  loadData();
+});
+
+// ---- BORRAR HISTORIAL COMPLETO DE LA NUBE ----
+document.getElementById('clearHistoryBtn').addEventListener('click', async ()=>{
+  initAudio();
+  if(confirm('¿Estás seguro de que deseas borrar de forma permanente todo el historial de la nube?')){
+    try {
+      const { error } = await supabaseClient
+        .from('historial')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000'); 
+      
+      if (error) throw error;
+      beepSuccess();
+      await loadData();
+    } catch(err) {
+      beepError();
+      console.error("Error al borrar historial:", err);
+      alert("No se pudo limpiar el historial.");
+    }
+  }
+});
+
+// ---- CREAR O EDITAR PRODUCTO EN LA NUBE ----
+document.getElementById('saveBtn').addEventListener('click', async ()=>{
+  initAudio();
+  const name = document.getElementById('f-name').value.trim();
+  if(!name){ document.getElementById('f-name').focus(); return; }
+  const sku = document.getElementById('f-sku').value.trim();
+  const cat = document.getElementById('f-cat').value.trim();
+  const price = parseFloat(document.getElementById('f-price').value) || 0;
+  const stock = parseInt(document.getElementById('f-stock').value) || 0;
+  const min = parseInt(document.getElementById('f-min').value);
+  const minVal = isNaN(min) ? 5 : min;
+
+  try {
+    if(editingId){
+      const p = products.find(x=>x.id===editingId);
+      if(p){
+        const diff = stock - p.stock;
+        
+        const { error } = await supabaseClient
+          .from('productos')
+          .update({ name, sku, cat, price, stock, min: minVal })
+          .eq('id', editingId);
+
+        if (error) throw error;
+        
+        if (diff > 0) {
+          await logMovement(p, 'entrada', diff, 'Ajuste manual (Edición)');
+          beepSuccess();
+        } else if (diff < 0) {
+          await logMovement(p, 'salida', Math.abs(diff), 'Ajuste manual (Edición)');
+          if (stock === 0) beepError();
+          else if (stock <= minVal) beepWarning();
+          else beepSuccess();
+        }
+      }
+    } else {
+      const { data, error } = await supabaseClient
+        .from('productos')
+        .insert([{ name, sku, cat, price, stock, min: minVal }])
+        .select();
+
+      if (error) throw error;
+      beepSuccess();
+
+      if (stock > 0 && data && data[0]) {
+        await logMovement(data[0], 'entrada', stock, 'Inventario inicial');
+      }
+    }
+  } catch (err) {
+    beepError();
+    console.error("Error al guardar producto:", err);
+    alert("Hubo un problema al guardar en la nube.");
+  }
+
+  closeForm();
+  await loadData();
+});
+
+// ---- CONTROL DE STOCK RÁPIDO (+ / - / ELIMINAR) ----
+document.getElementById('ledgerBody').addEventListener('click', async (e)=>{
+  initAudio();
+  const btn = e.target.closest('button');
+  if(!btn) return;
+  const id = btn.dataset.id;
+  const act = btn.dataset.act;
+  const p = products.find(x=>x.id===id);
+  if(!p) return;
+
+  try {
+    if(act==='inc'){ 
+      const newStock = p.stock + 1;
+      const { error } = await supabaseClient
+        .from('productos')
+        .update({ stock: newStock })
+        .eq('id', id);
+      
+      if (error) throw error;
+      beepSuccess();
+      await logMovement(p, 'entrada', 1, 'Ajuste rápido (+)');
+      await loadData();
+    }
+    else if(act==='dec'){ 
+      if (p.stock > 0) {
+        const newStock = p.stock - 1;
+        
+        // Sonidos y alertas inteligentes antes de impactar (SÚPER PODER 3)
+        if (newStock === 0) {
+          beepError(); // Alerta roja auditiva
+        } else if (newStock <= p.min) {
+          beepWarning(); // Advertencia de stock bajo
+        } else {
+          beepSuccess();
+        }
+
+        const { error } = await supabaseClient
+          .from('productos')
+          .update({ stock: newStock })
+          .eq('id', id);
+        
+        if (error) throw error;
+        await logMovement(p, 'salida', 1, 'Ajuste rápido (-)');
+        await loadData();
+      } else {
+        beepError();
+      }
+    }
+    else if(act==='edit'){ openForm(p); }
+    else if(act==='del'){
+      if(confirm(`¿Eliminar permanentemente "${p.name}" de la base de datos?`)){
+        if (p.stock > 0) {
+          await logMovement(p, 'salida', p.stock, 'Producto eliminado del inventario');
+        }
+        
+        const { error } = await supabaseClient
+          .from('productos')
+          .delete()
+          .eq('id', id);
+
+        if (error) throw error;
+        beepSuccess();
+        await loadData();
+      }
+    }
+  } catch (err) {
+    beepError();
+    console.error("Error al modificar stock/producto:", err);
+    alert("No se pudo procesar el cambio en la nube.");
+  }
+});
+
+
+// ===================================================================
+//                CÓDIGO DE LOS NUEVOS SÚPER PODERES
+// ===================================================================
+
+// ---- SÚPER PODER 1: EXPORTACIÓN DE DATOS A EXCEL (CSV) ----
+document.getElementById('exportBtn').addEventListener('click', () => {
+  initAudio();
+  if (products.length === 0) {
+    beepError();
+    alert("No hay productos registrados para exportar.");
+    return;
+  }
+
+  // Usamos el código de caracteres especial BOM (\uFEFF) para forzar a Excel a leer los acentos españoles
+  let csvContent = "\uFEFF";
+  csvContent += "Nombre del Producto;SKU;Categoría;Precio Unitario ($);Stock Existente;Stock Mínimo;Subtotal ($)\n";
+
+  products.forEach(p => {
+    const subtotal = (p.price * p.stock).toFixed(2);
+    // Escapamos comillas internas por seguridad
+    const nameSafe = p.name.replace(/"/g, '""');
+    const skuSafe = (p.sku || '').replace(/"/g, '""');
+    const catSafe = (p.cat || '').replace(/"/g, '""');
+
+    csvContent += `"${nameSafe}";"${skuSafe}";"${catSafe}";${p.price};${p.stock};${p.min};${subtotal}\n`;
+  });
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  
+  // Nombre del archivo personalizado según el negocio
+  const fileName = `Inventario_${storeName.replace(/\s+/g, '_') || 'Mi_Negocio'}.csv`;
+  
+  link.setAttribute("href", url);
+  link.setAttribute("download", fileName);
+  document.body.appendChild(link);
+  
+  beepSuccess();
+  link.click();
+  document.body.removeChild(link);
+});
+
+
+// ---- SÚPER PODER 2: ESCÁNER DE CÓDIGO DE BARRAS POR CÁMARA ----
+let html5QrCode = null;
+let activeScanProduct = null;
+
+// Abrir el escáner y prender la cámara
+document.getElementById('scanBtn').addEventListener('click', async () => {
+  initAudio();
+  document.getElementById('scannerModal').style.display = 'flex';
+  
+  // OPTIMIZACIÓN CLAVE: Configuramos la cámara para buscar específicamente
+  // formatos lineales comerciales (EAN y UPC) e industriales de barras.
+  html5QrCode = new Html5Qrcode("interactive-scanner", {
+    formatsToSupport: [
+      Html5QrcodeSupportedFormats.EAN_13,   // Estándar en México, Latam y Europa
+      Html5QrcodeSupportedFormats.EAN_8,    // Versión compacta para empaques chicos
+      Html5QrcodeSupportedFormats.UPC_A,    // Estándar americano (muy común en importados)
+      Html5QrcodeSupportedFormats.UPC_E,    // Versión compacta de UPC
+      Html5QrcodeSupportedFormats.CODE_128  // Códigos de barra logísticos comunes
+    ]
+  });
+  
+  const config = { 
+    fps: 20, // Elevamos la velocidad de cuadros para procesar rápido en movimiento
+    qrbox: function(viewfinderWidth, viewfinderHeight) {
+      // Forzamos un marco de enfoque rectangular (ancho y delgado) ideal para líneas de barra
+      const width = Math.min(viewfinderWidth * 0.85, 320);
+      const height = Math.min(viewfinderHeight * 0.35, 120);
+      return { width: width, height: height };
+    },
+    aspectRatio: 1.777778 // Formato panorámico para un rastreo horizontal óptimo
+  };
+
+  try {
+    // Busca usar la cámara trasera por defecto (facingMode: "environment")
+    await html5QrCode.start(
+      { facingMode: "environment" }, 
+      config,
+      onScanSuccess
+    );
+  } catch (err) {
+    beepError();
+    console.error("No se pudo iniciar la cámara: ", err);
+    alert("No se pudo acceder a la cámara. Revisa que otorgues los permisos correspondientes en tu navegador.");
+    closeScanner();
+  }
+});
+
+// Acción cuando se detecta un código exitosamente
+async function onScanSuccess(decodedText) {
+  beepSuccess();
+  
+  // Detenemos la cámara para no saturar procesos
+  await closeScanner();
+
+  const scannedSku = decodedText.trim();
+  const matchedProduct = products.find(p => p.sku === scannedSku);
+
+  if (matchedProduct) {
+    // Si el producto existe, abrimos su panel de control rápido
+    openScanActionModal(matchedProduct);
+  } else {
+    // Si no existe, sugerimos crearlo y auto-rellenamos el SKU en el formulario
+    beepError();
+    if (confirm(`El código de barras "${scannedSku}" no está registrado.\n¿Quieres registrar un nuevo producto con este SKU?`)) {
+      openForm({ id: null, name: '', sku: scannedSku, cat: '', price: '', stock: '', min: 5 });
+    }
+  }
+}
+
+// Cerrar el modal del escáner físicamente
+async function closeScanner() {
+  if (html5QrCode) {
+    try {
+      await html5QrCode.stop();
+    } catch(e) {}
+    html5QrCode = null;
+  }
+  document.getElementById('scannerModal').style.display = 'none';
+}
+
+document.getElementById('closeScannerBtn').addEventListener('click', () => {
+  initAudio();
+  closeScanner();
+});
+
+// MODAL DE ACCIÓN RÁPIDA (SUMAR/RESTAR)
+function openScanActionModal(product) {
+  activeScanProduct = product;
+  document.getElementById('scanActName').textContent = product.name;
+  document.getElementById('scanActSku').textContent = product.sku || '—';
+  document.getElementById('scanActStock').textContent = product.stock;
+  document.getElementById('scanActionModal').style.display = 'flex';
+}
+
+function closeScanActionModal() {
+  activeScanProduct = null;
+  document.getElementById('scanActionModal').style.display = 'none';
+  loadData(); // Refresca toda la lista principal
+}
+
+document.getElementById('closeScanActBtn').addEventListener('click', () => {
+  initAudio();
+  closeScanActionModal();
+});
+
+// Sumar 1 en el modal rápido
+document.getElementById('scanActIncBtn').addEventListener('click', async () => {
+  initAudio();
+  if (!activeScanProduct) return;
+  
+  try {
+    const newStock = activeScanProduct.stock + 1;
+    const { error } = await supabaseClient
+      .from('productos')
+      .update({ stock: newStock })
+      .eq('id', activeScanProduct.id);
+    
+    if (error) throw error;
+    
+    beepSuccess();
+    await logMovement(activeScanProduct, 'entrada', 1, 'Escáner rápido (+)');
+    
+    activeScanProduct.stock = newStock;
+    document.getElementById('scanActStock').textContent = newStock;
+  } catch (err) {
+    beepError();
+    alert("No se pudo actualizar el stock.");
+  }
+});
+
+// Restar 1 en el modal rápido
+document.getElementById('scanActDecBtn').addEventListener('click', async () => {
+  initAudio();
+  if (!activeScanProduct) return;
+  
+  if (activeScanProduct.stock <= 0) {
+    beepError();
+    return;
+  }
+
+  try {
+    const newStock = activeScanProduct.stock - 1;
+    
+    if (newStock === 0) {
+      beepError();
+    } else if (newStock <= activeScanProduct.min) {
+      beepWarning();
+    } else {
+      beepSuccess();
+    }
+
+    const { error } = await supabaseClient
+      .from('productos')
+      .update({ stock: newStock })
+      .eq('id', activeScanProduct.id);
+    
+    if (error) throw error;
+    
+    await logMovement(activeScanProduct, 'salida', 1, 'Escáner rápido (-)');
+    
+    activeScanProduct.stock = newStock;
+    document.getElementById('scanActStock').textContent = newStock;
+  } catch (err) {
+    beepError();
+    alert("No se pudo actualizar el stock.");
+  }
+});
+
+
+// ---- EVENTOS DE BÚSQUEDA Y NOMBRE DE TIENDA ----
+document.getElementById('search').addEventListener('input', render);
+document.getElementById('filterCat').addEventListener('change', render);
+
+let nameTimeout;
+document.getElementById('storeName').addEventListener('input', (e)=>{
+  storeName = e.target.value;
+  localStorage.setItem('inventory-store-name', storeName);
+  clearTimeout(nameTimeout);
+});
+</script>
+</body>
+</html>
